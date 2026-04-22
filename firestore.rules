@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Hardened Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isMentor() {
+      return isSignedIn() && getUserData().role == 'mentor';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); 
+      
+      allow create: if isOwner(userId) && 
+                    incoming().userId == request.auth.uid &&
+                    incoming().role == 'student' && // Default to student
+                    incoming().karma == 0;
+      
+      allow update: if isOwner(userId) &&
+                    incoming().userId == existing().userId &&
+                    // Preventive: Don't allow massive karma jumps in one go if we were being strict
+                    // But for this prototype we allow the client to increment
+                    (incoming().role == 'student' || incoming().role == 'mentor');
+    }
+
+    match /questions/{questionId} {
+      allow list: if true; 
+      allow get: if true;
+      
+      allow create: if isSignedIn() && 
+                    incoming().authorId == request.auth.uid &&
+                    incoming().title is string &&
+                    incoming().content is string;
+      
+      allow update: if isSignedIn() && (
+        // Mentors can do everything on questions (for moderation/verification)
+        isMentor() || 
+        // Owners can update content but NOT verification status
+        (isOwner(existing().authorId) && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'category'])) ||
+        // Peers can only update karma/votes
+        (incoming().diff(existing()).affectedKeys().hasOnly(['karmaAwarded', 'upvotes', 'votes']))
+      );
+      
+      allow delete: if isOwner(existing().authorId) || isMentor();
+    }
+
+    match /answers/{answerId} {
+      allow list: if true;
+      allow get: if true;
+      
+      allow create: if isSignedIn() && 
+                    incoming().authorId == request.auth.uid &&
+                    incoming().content is string;
+      
+      allow update: if isSignedIn() && (
+        // Mentors can do everything (including verification)
+        isMentor() || 
+        // Owners can edit content but NOT verification status
+        (isOwner(existing().authorId) && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['content'])) ||
+        // Peers can only update karma/votes
+        (incoming().diff(existing()).affectedKeys().hasOnly(['karmaAwarded', 'upvotes', 'votes']))
+      );
+
+      allow delete: if isOwner(existing().authorId) || isMentor();
+    }
+
+    // Fallback Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

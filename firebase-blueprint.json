@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "Question": {
+      "title": "Question",
+      "description": "A question asked anonymously by a student.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "anonymousHandle": { "type": "string" },
+        "authorId": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isAiFacilitated": { "type": "boolean" },
+        "aiNudge": { "type": "string" },
+        "isOffline": { "type": "boolean" },
+        "syncedFromOffline": { "type": "boolean" },
+        "karmaAwarded": { "type": "integer" }
+      },
+      "required": ["title", "content", "anonymousHandle", "authorId", "createdAt"]
+    },
+    "Answer": {
+      "title": "Answer",
+      "description": "A collaborative response to a question.",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string", "enum": ["student", "mentor"] },
+        "content": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["questionId", "content", "authorId", "authorRole", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with role and karma.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "anonymousHandle": { "type": "string" },
+        "karma": { "type": "integer" },
+        "levelName": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "mentor"] },
+        "expertise": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["userId", "anonymousHandle", "role"]
+    }
+  },
+  "firestore": {
+    "questions/{questionId}": {
+      "schema": "Question",
+      "description": "Collection of questions."
+    },
+    "answers/{answerId}": {
+      "schema": "Answer",
+      "description": "Top-level answers collection."
+    },
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile."
+    }
+  }
+}
